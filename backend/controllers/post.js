@@ -1,4 +1,7 @@
 import mongoose from 'mongoose';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { postModel } from '../models/post.js';
 import { userModel } from '../models/user.js';
 import { createPostValidation, updatePostValidation, getPostsValidation } from '../lib/validators/post.js';
@@ -6,18 +9,34 @@ import CustomError from '../lib/ResponseHandler/CustomError.js';
 import CustomSuccess from '../lib/ResponseHandler/CustomSuccess.js';
 import logger from '../utils/logger.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const { Types } = mongoose;
 const ObjectId = Types.ObjectId;
 
 export const createPost = async (req, res, next) => {
   try {
     const { userId } = req.user;
-    const { title, content, excerpt, status, tags } = req.body;
+    let { title, content, excerpt, status, tags } = req.body;
 
-    const { error } = createPostValidation.validate(req.body);
+    if (typeof tags === 'string') {
+      try {
+        tags = JSON.parse(tags);
+      } catch (e) {
+        tags = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      }
+    }
+
+    const { error } = createPostValidation.validate({ title, content, excerpt, status, tags });
     if (error) {
       logger.error(`Validation Error: ${error.details[0].message}`);
       return next(CustomError.badRequest(error.details[0].message));
+    }
+
+    let imagePath = null;
+    if (req.file) {
+      imagePath = `/uploads/${req.file.filename}`;
     }
 
     const post = new postModel({
@@ -27,6 +46,7 @@ export const createPost = async (req, res, next) => {
       author: userId,
       status: status || 'draft',
       tags: tags || [],
+      image: imagePath,
     });
 
     const result = await post.populate('author', 'name email');
@@ -236,9 +256,24 @@ export const updatePost = async (req, res, next) => {
     const { id } = req.params;
     const { userId } = req.user;
     const userRole = req.userRole;
-    const { title, content, excerpt, status, tags } = req.body;
+    let { title, content, excerpt, status, tags } = req.body;
 
-    const { error } = updatePostValidation.validate(req.body);
+    if (tags && typeof tags === 'string') {
+      try {
+        tags = JSON.parse(tags);
+      } catch (e) {
+        tags = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      }
+    }
+
+    const updateData = {};
+    if (title) updateData.title = title;
+    if (content) updateData.content = content;
+    if (excerpt !== undefined) updateData.excerpt = excerpt;
+    if (status) updateData.status = status;
+    if (tags) updateData.tags = tags;
+
+    const { error } = updatePostValidation.validate(updateData);
     if (error) {
       logger.error(`Validation Error: ${error.details[0].message}`);
       return next(CustomError.badRequest(error.details[0].message));
@@ -256,12 +291,19 @@ export const updatePost = async (req, res, next) => {
       return next(CustomError.forbidden('You are not authorized to update this post'));
     }
 
-    if (title) post.title = title;
-    if (content) post.content = content;
-    if (excerpt !== undefined) post.excerpt = excerpt;
-    if (status) post.status = status;
-    if (tags) post.tags = tags;
+    if (req.file) {
+      if (post.image) {
+        const oldImagePath = path.join(__dirname, '..', post.image);
+        try {
+          fs.unlinkSync(oldImagePath);
+        } catch (err) {
+          logger.error(`Error deleting old image: ${err}`);
+        }
+      }
+      updateData.image = `/uploads/${req.file.filename}`;
+    }
 
+    Object.assign(post, updateData);
     const result = await post.save();
     await result.populate('author', 'name email');
 
@@ -297,6 +339,15 @@ export const deletePost = async (req, res, next) => {
     if (userRole !== 'admin' && post.author.toString() !== userId) {
       logger.error(`Error of ${userId}: Unauthorized to delete post`);
       return next(CustomError.forbidden('You are not authorized to delete this post'));
+    }
+
+    if (post.image) {
+      const imagePath = path.join(__dirname, '..', post.image);
+      try {
+        fs.unlinkSync(imagePath);
+      } catch (err) {
+        logger.error(`Error deleting image file: ${err}`);
+      }
     }
 
     await postModel.findByIdAndDelete(id);

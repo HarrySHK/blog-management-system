@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { postAPI } from '../utils/api';
+import { postAPI, getImageUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
 const PublicBlog = () => {
@@ -89,6 +89,15 @@ const PublicBlog = () => {
                 <div style={{ color: '#666', marginBottom: '10px' }}>
                   By {post.author?.name} | {new Date(post.createdAt).toLocaleDateString()} | Views: {post.views}
                 </div>
+                {post.image && (
+                  <div style={{ marginBottom: '10px' }}>
+                    <img
+                      src={getImageUrl(post.image)}
+                      alt={post.title}
+                      style={{ width: '100%', maxHeight: '300px', objectFit: 'cover', borderRadius: '5px' }}
+                    />
+                  </div>
+                )}
                 {post.excerpt && <p style={{ marginBottom: '10px' }}>{post.excerpt}</p>}
                 <Link to={`/posts/${post._id}`}>Read more →</Link>
                 {post.tags && post.tags.length > 0 && (

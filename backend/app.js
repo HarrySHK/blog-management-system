@@ -10,8 +10,13 @@ import authRouter from "./routes/auth.js"
 import postRouter from "./routes/post.js"
 import commentRouter from "./routes/comment.js"
 import userRouter from "./routes/user.js"
+import path from "path"
+import { fileURLToPath } from "url"
 
 dotenv.config()
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const version = process.env.API_VERSION || 'v1'
 const app = express()
@@ -26,6 +31,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(cors());
 app.use(morgan('tiny'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use(`/api/${version}/auth`, authRouter);
 app.use(`/api/${version}/posts`, postRouter);

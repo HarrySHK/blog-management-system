@@ -2,6 +2,13 @@ import axios from 'axios';
 
 const API_VERSION = import.meta.env.VITE_API_VERSION || 'v1';
 const API_URL = import.meta.env.VITE_API_URL || '/api';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+
+export const getImageUrl = (imagePath) => {
+  if (!imagePath) return null;
+  if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
+  return `${BACKEND_URL}${imagePath}`;
+};
 
 const api = axios.create({
   baseURL: `${API_URL}/${API_VERSION}`,
@@ -74,8 +81,42 @@ export const authAPI = {
 export const postAPI = {
   getPosts: (params) => api.get('/posts', { params }),
   getPost: (id) => api.get(`/posts/${id}`),
-  createPost: (data) => api.post('/posts', data),
-  updatePost: (id, data) => api.put(`/posts/${id}`, data),
+  createPost: (data) => {
+    const formData = new FormData();
+    Object.keys(data).forEach(key => {
+      if (key === 'tags' && Array.isArray(data[key])) {
+        formData.append(key, JSON.stringify(data[key]));
+      } else if (key !== 'image') {
+        formData.append(key, data[key]);
+      }
+    });
+    if (data.image instanceof File) {
+      formData.append('image', data.image);
+    }
+    return api.post('/posts', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  updatePost: (id, data) => {
+    const formData = new FormData();
+    Object.keys(data).forEach(key => {
+      if (key === 'tags' && Array.isArray(data[key])) {
+        formData.append(key, JSON.stringify(data[key]));
+      } else if (key !== 'image') {
+        formData.append(key, data[key]);
+      }
+    });
+    if (data.image instanceof File) {
+      formData.append('image', data.image);
+    }
+    return api.put(`/posts/${id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
   deletePost: (id) => api.delete(`/posts/${id}`),
   getPublicPosts: (params) => api.get('/posts/public', { params }),
 };

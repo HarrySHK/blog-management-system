@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { postAPI, userAPI } from '../utils/api';
+import { postAPI, userAPI, getImageUrl } from '../utils/api';
 
 const Dashboard = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -106,6 +106,15 @@ const Dashboard = () => {
                 <h3>
                   <Link to={`/posts/${post._id}`}>{post.title}</Link>
                 </h3>
+                {post.image && (
+                  <div style={{ marginBottom: '10px' }}>
+                    <img
+                      src={getImageUrl(post.image)}
+                      alt={post.title}
+                      style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '5px' }}
+                    />
+                  </div>
+                )}
                 <p style={{ color: '#666' }}>
                   Status: <span style={{ fontWeight: 'bold', color: post.status === 'published' ? 'green' : 'orange' }}>
                     {post.status.toUpperCase()}

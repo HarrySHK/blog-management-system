@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { postAPI } from '../utils/api';
+import { postAPI, getImageUrl } from '../utils/api';
 
 const PostForm = () => {
   const { id } = useParams();
@@ -8,12 +8,14 @@ const PostForm = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [imagePreview, setImagePreview] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     content: '',
     excerpt: '',
     status: 'draft',
     tags: '',
+    image: null,
   });
 
   useEffect(() => {
@@ -33,11 +35,30 @@ const PostForm = () => {
           excerpt: post.excerpt || '',
           status: post.status || 'draft',
           tags: post.tags?.join(', ') || '',
+          image: null,
         });
+        if (post.image) {
+          setImagePreview(post.image);
+        }
       }
     } catch (error) {
       console.error('Error fetching post:', error);
       setError('Failed to load post');
+    }
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData({ ...formData, image: file });
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result);
+      };
+      reader.onerror = () => {
+        setError('Error reading image file');
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -85,6 +106,27 @@ const PostForm = () => {
             required
             style={{ width: '100%', padding: '8px', marginTop: '5px' }}
           />
+        </div>
+        <div style={{ marginBottom: '15px' }}>
+          <label>Image:</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+          />
+          {imagePreview && (
+            <div style={{ marginTop: '10px' }}>
+              <img
+                src={imagePreview.startsWith('data:') ? imagePreview : getImageUrl(imagePreview)}
+                alt="Preview"
+                style={{ maxWidth: '300px', maxHeight: '300px', borderRadius: '5px', marginTop: '10px', objectFit: 'cover' }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+            </div>
+          )}
         </div>
         <div style={{ marginBottom: '15px' }}>
           <label>Excerpt:</label>

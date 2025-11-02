@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { postAPI, commentAPI } from '../utils/api';
+import { postAPI, commentAPI, getImageUrl } from '../utils/api';
 
 const PostDetail = () => {
   const { id } = useParams();
@@ -89,6 +89,15 @@ const PostDetail = () => {
             </div>
           )}
         </div>
+        {post.image && (
+          <div style={{ marginBottom: '20px' }}>
+            <img
+              src={getImageUrl(post.image)}
+              alt={post.title}
+              style={{ width: '100%', maxHeight: '500px', objectFit: 'cover', borderRadius: '5px' }}
+            />
+          </div>
+        )}
         {post.excerpt && <p style={{ fontStyle: 'italic', color: '#666', marginBottom: '20px' }}>{post.excerpt}</p>}
         <div style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{post.content}</div>
       </article>
