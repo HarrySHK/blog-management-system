@@ -1,17 +1,29 @@
 import axios from 'axios';
 
 const API_VERSION = import.meta.env.VITE_API_VERSION || 'v1';
-const API_URL = import.meta.env.VITE_API_URL || '/api';
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+const PRODUCTION_URL = 'https://blog-management-system-yhkg.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL || `${PRODUCTION_URL}/api`;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || PRODUCTION_URL;
+
+const getBaseURL = () => {
+  if (API_URL.startsWith('http')) {
+    return `${API_URL}/${API_VERSION}`;
+  }
+  return `${API_URL}/${API_VERSION}`;
+};
 
 export const getImageUrl = (imagePath) => {
   if (!imagePath) return null;
   if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
+  if (API_URL.startsWith('http')) {
+    const baseUrl = API_URL.replace('/api', '');
+    return `${baseUrl}${imagePath}`;
+  }
   return `${BACKEND_URL}${imagePath}`;
 };
 
 const api = axios.create({
-  baseURL: `${API_URL}/${API_VERSION}`,
+  baseURL: getBaseURL(),
   withCredentials: true,
 });
 
@@ -41,8 +53,9 @@ api.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem('refreshToken');
         if (refreshToken) {
+          const refreshUrl = getBaseURL() + '/auth/refresh';
           const refreshResponse = await axios.post(
-            `${API_URL}/${API_VERSION}/auth/refresh`,
+            refreshUrl,
             { refreshToken },
             { withCredentials: true }
           );
