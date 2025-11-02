@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { commentModel } from '../models/comment.js';
 import { postModel } from '../models/post.js';
 import { userModel } from '../models/user.js';
@@ -5,6 +6,9 @@ import { createCommentValidation, updateCommentValidation } from '../lib/validat
 import CustomError from '../lib/ResponseHandler/CustomError.js';
 import CustomSuccess from '../lib/ResponseHandler/CustomSuccess.js';
 import logger from '../utils/logger.js';
+
+const { Types } = mongoose;
+const ObjectId = Types.ObjectId;
 
 export const createComment = async (req, res, next) => {
   try {
@@ -58,16 +62,52 @@ export const getComments = async (req, res, next) => {
   try {
     const { postId } = req.params;
 
-    const post = await postModel.findById(postId);
-    if (!post) {
+    const postCheck = await postModel.findById(postId);
+    if (!postCheck) {
       logger.error('Post not found');
       return next(CustomError.notFound('Post not found'));
     }
 
-    const comments = await commentModel
-      .find({ post: postId, status: 'approved' })
-      .populate('author', 'name email')
-      .sort({ createdAt: -1 });
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      logger.error('Invalid post ID');
+      return next(CustomError.notFound('Post not found'));
+    }
+
+    const pipeline = [
+      {
+        $match: {
+          post: new ObjectId(postId),
+          status: 'approved',
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'author',
+          foreignField: '_id',
+          as: 'author',
+          pipeline: [
+            {
+              $project: {
+                name: 1,
+                email: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $unwind: {
+          path: '$author',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $sort: { createdAt: -1 },
+      },
+    ];
+
+    const comments = await commentModel.aggregate(pipeline);
 
     logger.info(`Comments fetched successfully`);
 
@@ -181,15 +221,66 @@ export const getAllComments = async (req, res, next) => {
   try {
     const { status, post } = req.query;
 
-    const query = {};
-    if (status) query.status = status;
-    if (post) query.post = post;
+    const matchStage = {};
+    if (status) matchStage.status = status;
+    if (post) {
+      if (!mongoose.Types.ObjectId.isValid(post)) {
+        return next(CustomError.badRequest('Invalid post ID'));
+      }
+      matchStage.post = new ObjectId(post);
+    }
 
-    const comments = await commentModel
-      .find(query)
-      .populate('author', 'name email')
-      .populate('post', 'title')
-      .sort({ createdAt: -1 });
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'author',
+          foreignField: '_id',
+          as: 'author',
+          pipeline: [
+            {
+              $project: {
+                name: 1,
+                email: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: 'posts',
+          localField: 'post',
+          foreignField: '_id',
+          as: 'post',
+          pipeline: [
+            {
+              $project: {
+                title: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $unwind: {
+          path: '$author',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $unwind: {
+          path: '$post',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $sort: { createdAt: -1 },
+      },
+    ];
+
+    const comments = await commentModel.aggregate(pipeline);
 
     logger.info(`All comments fetched successfully`);
 

@@ -1,9 +1,13 @@
+import mongoose from 'mongoose';
 import { postModel } from '../models/post.js';
 import { userModel } from '../models/user.js';
 import { createPostValidation, updatePostValidation, getPostsValidation } from '../lib/validators/post.js';
 import CustomError from '../lib/ResponseHandler/CustomError.js';
 import CustomSuccess from '../lib/ResponseHandler/CustomSuccess.js';
 import logger from '../utils/logger.js';
+
+const { Types } = mongoose;
+const ObjectId = Types.ObjectId;
 
 export const createPost = async (req, res, next) => {
   try {
@@ -54,34 +58,80 @@ export const getPosts = async (req, res, next) => {
       return next(CustomError.badRequest(error.details[0].message));
     }
 
-    const query = {};
+    const matchStage = {};
     
     if (status) {
-      query.status = status;
+      matchStage.status = status;
     }
     
     if (author) {
-      query.author = author;
+      if (!mongoose.Types.ObjectId.isValid(author)) {
+        return next(CustomError.badRequest('Invalid author ID'));
+      }
+      matchStage.author = new ObjectId(author);
     }
     
     if (search) {
-      query.$text = { $search: search };
+      matchStage.$text = { $search: search };
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    let postsQuery = postModel.find(query)
-      .populate('author', 'name email')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+    const limitNum = parseInt(limit);
+
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'author',
+          foreignField: '_id',
+          as: 'author',
+          pipeline: [
+            {
+              $project: {
+                name: 1,
+                email: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $unwind: {
+          path: '$author',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    ];
 
     if (search) {
-      postsQuery = postsQuery.sort({ score: { $meta: 'textScore' } });
+      pipeline.push({
+        $addFields: {
+          score: { $meta: 'textScore' },
+        },
+      });
+      pipeline.push({ $sort: { score: -1 } });
+    } else {
+      pipeline.push({ $sort: { createdAt: -1 } });
     }
 
-    const posts = await postsQuery;
-    const total = await postModel.countDocuments(query);
+    const facetStage = {
+      $facet: {
+        posts: [
+          { $skip: skip },
+          { $limit: limitNum },
+        ],
+        total: [
+          { $count: 'count' },
+        ],
+      },
+    };
+
+    pipeline.push(facetStage);
+
+    const result = await postModel.aggregate(pipeline);
+    const posts = result[0]?.posts || [];
+    const total = result[0]?.total[0]?.count || 0;
 
     logger.info(`Posts fetched successfully`);
 
@@ -91,9 +141,9 @@ export const getPosts = async (req, res, next) => {
           posts,
           pagination: {
             page: parseInt(page),
-            limit: parseInt(limit),
+            limit: limitNum,
             total,
-            pages: Math.ceil(total / parseInt(limit)),
+            pages: Math.ceil(total / limitNum),
           },
         },
         'Posts fetched successfully',
@@ -111,12 +161,45 @@ export const getPost = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const post = await postModel.findById(id).populate('author', 'name email');
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      logger.error('Invalid post ID');
+      return next(CustomError.notFound('Post not found'));
+    }
+
+    const pipeline = [
+      { $match: { _id: new ObjectId(id) } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'author',
+          foreignField: '_id',
+          as: 'author',
+          pipeline: [
+            {
+              $project: {
+                name: 1,
+                email: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $unwind: {
+          path: '$author',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    ];
+
+    const result = await postModel.aggregate(pipeline);
     
-    if (!post) {
+    if (!result || result.length === 0) {
       logger.error('Post not found');
       return next(CustomError.notFound('Post not found'));
     }
+
+    const post = result[0];
 
     if (post.status === 'draft') {
       const { userId } = req.user || {};
@@ -128,8 +211,8 @@ export const getPost = async (req, res, next) => {
         return next(CustomError.forbidden('Access denied'));
       }
     } else {
-      post.views += 1;
-      await post.save();
+      await postModel.findByIdAndUpdate(id, { $inc: { views: 1 } });
+      post.views = (post.views || 0) + 1;
     }
 
     logger.info(`Post fetched successfully`);
@@ -238,26 +321,67 @@ export const getPublicPosts = async (req, res, next) => {
   try {
     const { page = 1, limit = 10, search } = req.query;
     
-    const query = { status: 'published' };
+    const matchStage = { status: 'published' };
     
     if (search) {
-      query.$text = { $search: search };
+      matchStage.$text = { $search: search };
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    let postsQuery = postModel.find(query)
-      .populate('author', 'name email')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+    const limitNum = parseInt(limit);
+
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'author',
+          foreignField: '_id',
+          as: 'author',
+          pipeline: [
+            {
+              $project: {
+                name: 1,
+                email: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $unwind: {
+          path: '$author',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    ];
 
     if (search) {
-      postsQuery = postsQuery.sort({ score: { $meta: 'textScore' } });
+      pipeline.push({
+        $addFields: {
+          score: { $meta: 'textScore' },
+        },
+      });
+      pipeline.push({ $sort: { score: -1 } });
+    } else {
+      pipeline.push({ $sort: { createdAt: -1 } });
     }
 
-    const posts = await postsQuery;
-    const total = await postModel.countDocuments(query);
+    pipeline.push({
+      $facet: {
+        posts: [
+          { $skip: skip },
+          { $limit: limitNum },
+        ],
+        total: [
+          { $count: 'count' },
+        ],
+      },
+    });
+
+    const result = await postModel.aggregate(pipeline);
+    const posts = result[0]?.posts || [];
+    const total = result[0]?.total[0]?.count || 0;
 
     logger.info(`Public posts fetched successfully`);
 
@@ -267,9 +391,9 @@ export const getPublicPosts = async (req, res, next) => {
           posts,
           pagination: {
             page: parseInt(page),
-            limit: parseInt(limit),
+            limit: limitNum,
             total,
-            pages: Math.ceil(total / parseInt(limit)),
+            pages: Math.ceil(total / limitNum),
           },
         },
         'Posts fetched successfully',
