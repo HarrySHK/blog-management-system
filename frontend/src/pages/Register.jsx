@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import '../styles/global.css';
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -9,11 +10,16 @@ const Register = () => {
   const [role, setRole] = useState('author');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { register, isAuthenticated } = useAuth();
+  const { register: contextRegister, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
   if (isAuthenticated) {
-    navigate('/dashboard');
     return null;
   }
 
@@ -22,72 +28,79 @@ const Register = () => {
     setError('');
     setLoading(true);
 
-    const result = await register(name, email, password, role);
+    const result = await contextRegister(name, email, password, role);
     if (result.success) {
       navigate('/dashboard');
     } else {
-      setError(result.message);
+      setError(result.message || 'Registration failed');
     }
     setLoading(false);
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px' }}>
-      <h2>Register</h2>
-      <form onSubmit={handleSubmit}>
-        {error && <div style={{ color: 'red', marginBottom: '10px' }}>{error}</div>}
-        <div style={{ marginBottom: '15px' }}>
-          <label>Name:</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
+    <div className="container" style={{ maxWidth: '450px', marginTop: '80px' }}>
+      <div className="card">
+        <h2 style={{ marginBottom: '24px', color: '#333', textAlign: 'center' }}>Register</h2>
+        <form onSubmit={handleSubmit}>
+          {error && <div className="error">{error}</div>}
+          <div className="form-group">
+            <label className="label">Name:</label>
+            <input
+              type="text"
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder="Enter your name"
+            />
+          </div>
+          <div className="form-group">
+            <label className="label">Email:</label>
+            <input
+              type="email"
+              className="input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="Enter your email"
+            />
+          </div>
+          <div className="form-group">
+            <label className="label">Password:</label>
+            <input
+              type="password"
+              className="input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              placeholder="Enter your password (min 8 characters)"
+            />
+          </div>
+          <div className="form-group">
+            <label className="label">Role:</label>
+            <select
+              className="select"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+            >
+              <option value="author">Author</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: '100%', marginTop: '12px' }}>
+            {loading ? 'Registering...' : 'Register'}
+          </button>
+        </form>
+        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          <p style={{ color: '#666', marginBottom: '10px' }}>
+            Already have an account? <Link to="/login" className="text-link">Login</Link>
+          </p>
+          <p>
+            <Link to="/" className="text-link">View Public Blog</Link>
+          </p>
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>Email:</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>Password:</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>Role:</label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          >
-            <option value="author">Author</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
-        <button type="submit" disabled={loading} style={{ width: '100%', padding: '10px', marginBottom: '10px' }}>
-          {loading ? 'Registering...' : 'Register'}
-        </button>
-      </form>
-      <p>
-        Already have an account? <Link to="/login">Login</Link>
-      </p>
-      <p>
-        <Link to="/">View Public Blog</Link>
-      </p>
+      </div>
     </div>
   );
 };

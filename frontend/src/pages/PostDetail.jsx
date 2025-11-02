@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { postAPI, commentAPI, getImageUrl } from '../utils/api';
+import { usePosts } from '../hooks/usePosts';
+import { useComments } from '../hooks/useComments';
+import { getImageUrl } from '../utils/api';
+import '../styles/global.css';
 
 const PostDetail = () => {
   const { id } = useParams();
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { getPost } = usePosts();
+  const { comments, loading: commentsLoading, fetchComments, createComment } = useComments(id);
   const [post, setPost] = useState(null);
-  const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [commentLoading, setCommentLoading] = useState(false);
@@ -19,28 +23,12 @@ const PostDetail = () => {
   }, [id]);
 
   const fetchPost = async () => {
-    try {
-      setLoading(true);
-      const response = await postAPI.getPost(id);
-      if (response.status) {
-        setPost(response.data);
-      }
-    } catch (error) {
-      console.error('Error fetching post:', error);
-    } finally {
-      setLoading(false);
+    setLoading(true);
+    const result = await getPost(id);
+    if (result.success) {
+      setPost(result.post);
     }
-  };
-
-  const fetchComments = async () => {
-    try {
-      const response = await commentAPI.getComments(id);
-      if (response.status) {
-        setComments(response.data);
-      }
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-    }
+    setLoading(false);
   };
 
   const handleCommentSubmit = async (e) => {
@@ -50,86 +38,105 @@ const PostDetail = () => {
       return;
     }
 
-    try {
-      setCommentLoading(true);
-      const response = await commentAPI.createComment({ post: id, content: newComment });
-      if (response.status) {
-        setNewComment('');
-        fetchComments();
-      }
-    } catch (error) {
-      console.error('Error creating comment:', error);
-    } finally {
-      setCommentLoading(false);
+    setCommentLoading(true);
+    const result = await createComment({ post: id, content: newComment });
+    if (result.success) {
+      setNewComment('');
     }
+    setCommentLoading(false);
   };
 
   if (loading) {
-    return <div style={{ maxWidth: '800px', margin: '50px auto', padding: '20px' }}>Loading...</div>;
+    return (
+      <div className="container">
+        <div className="loading">Loading...</div>
+      </div>
+    );
   }
 
   if (!post) {
-    return <div style={{ maxWidth: '800px', margin: '50px auto', padding: '20px' }}>Post not found</div>;
+    return (
+      <div className="container">
+        <div className="empty-state">
+          <h3>Post not found</h3>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div style={{ maxWidth: '800px', margin: '50px auto', padding: '20px' }}>
+    <div className="container">
       <div style={{ marginBottom: '20px' }}>
-        <Link to="/dashboard">← Back to Dashboard</Link>
+        <Link to="/" className="text-link">← Back to Blog</Link>
       </div>
-      <article>
-        <h1>{post.title}</h1>
-        <div style={{ color: '#666', marginBottom: '20px' }}>
-          <p>
-            By {post.author?.name} | {new Date(post.createdAt).toLocaleDateString()} | Views: {post.views}
-          </p>
-          {post.tags && post.tags.length > 0 && (
-            <div style={{ marginTop: '10px' }}>
-              Tags: {post.tags.map(tag => <span key={tag} style={{ marginRight: '5px', background: '#f0f0f0', padding: '2px 8px', borderRadius: '3px' }}>{tag}</span>)}
-            </div>
-          )}
+      <article className="card">
+        <h1 style={{ marginBottom: '16px', color: '#333' }}>{post.title}</h1>
+        <div className="post-meta" style={{ marginBottom: '20px' }}>
+          <span>By {post.author?.name}</span>
+          {' • '}
+          <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+          {' • '}
+          <span>{post.views} views</span>
         </div>
-        {post.image && (
+        {post.tags && post.tags.length > 0 && (
           <div style={{ marginBottom: '20px' }}>
-            <img
-              src={getImageUrl(post.image)}
-              alt={post.title}
-              style={{ width: '100%', maxHeight: '500px', objectFit: 'cover', borderRadius: '5px' }}
-            />
+            {post.tags.map(tag => (
+              <span key={tag} className="tag">{tag}</span>
+            ))}
           </div>
         )}
-        {post.excerpt && <p style={{ fontStyle: 'italic', color: '#666', marginBottom: '20px' }}>{post.excerpt}</p>}
-        <div style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{post.content}</div>
+        {post.image && (
+          <img
+            src={getImageUrl(post.image)}
+            alt={post.title}
+            style={{ width: '100%', maxHeight: '500px', objectFit: 'cover', borderRadius: '8px', marginBottom: '20px' }}
+          />
+        )}
+        {post.excerpt && (
+          <p style={{ fontStyle: 'italic', color: '#666', marginBottom: '20px', fontSize: '18px' }}>
+            {post.excerpt}
+          </p>
+        )}
+        <div
+          dangerouslySetInnerHTML={{ __html: post.content }}
+          style={{ lineHeight: '1.8', color: '#333' }}
+        />
       </article>
 
-      <div style={{ marginTop: '40px', borderTop: '1px solid #ccc', paddingTop: '20px' }}>
-        <h3>Comments ({comments.length})</h3>
+      <div className="card" style={{ marginTop: '30px' }}>
+        <h3 style={{ marginBottom: '20px', color: '#333' }}>Comments ({comments.length})</h3>
         {isAuthenticated ? (
-          <form onSubmit={handleCommentSubmit} style={{ marginBottom: '20px' }}>
+          <form onSubmit={handleCommentSubmit} style={{ marginBottom: '24px' }}>
             <textarea
+              className="textarea"
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="Add a comment..."
               required
-              rows={3}
-              style={{ width: '100%', padding: '8px', marginBottom: '10px' }}
+              rows={4}
             />
-            <button type="submit" disabled={commentLoading}>Submit Comment</button>
+            <button type="submit" disabled={commentLoading} className="btn btn-primary" style={{ marginTop: '12px' }}>
+              {commentLoading ? 'Submitting...' : 'Submit Comment'}
+            </button>
           </form>
         ) : (
-          <p><Link to="/login">Login</Link> to add a comment</p>
+          <p style={{ marginBottom: '20px' }}>
+            <Link to="/login" className="text-link">Login</Link> to add a comment
+          </p>
         )}
         <div>
-          {comments.length === 0 ? (
-            <p>No comments yet. Be the first to comment!</p>
+          {commentsLoading && comments.length === 0 ? (
+            <div className="loading">Loading comments...</div>
+          ) : comments.length === 0 ? (
+            <div className="empty-state">
+              <p>No comments yet. Be the first to comment!</p>
+            </div>
           ) : (
             comments.map((comment) => (
-              <div key={comment._id} style={{ border: '1px solid #ccc', padding: '15px', marginBottom: '15px', borderRadius: '5px' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{comment.author?.name}</div>
-                <div>{comment.content}</div>
-                <div style={{ color: '#666', fontSize: '0.9em', marginTop: '5px' }}>
-                  {new Date(comment.createdAt).toLocaleDateString()}
-                </div>
+              <div key={comment._id} className="comment-card">
+                <div className="comment-author">{comment.author?.name}</div>
+                <div className="comment-content">{comment.content}</div>
+                <div className="comment-date">{new Date(comment.createdAt).toLocaleDateString()}</div>
               </div>
             ))
           )}

@@ -1,148 +1,107 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { postAPI, userAPI, getImageUrl } from '../utils/api';
+import { usePosts } from '../hooks/usePosts';
+import { useUsers } from '../hooks/useUsers';
+import { getImageUrl } from '../utils/api';
+import InfiniteScroll from '../components/InfiniteScroll';
+import '../styles/global.css';
 
 const Dashboard = () => {
   const { user, logout, isAdmin } = useAuth();
-  const [posts, setPosts] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const navigate = useNavigate();
+  const { posts, loading, hasMore, loadMore, deletePost, refresh } = usePosts({
+    ...(!isAdmin && { author: user?.id }),
+  });
+  const { stats, getUserStats } = useUsers();
 
   useEffect(() => {
-    fetchPosts();
-    fetchStats();
-  }, [page]);
-
-  const fetchPosts = async () => {
-    try {
-      setLoading(true);
-      const params = { page, limit: 10 };
-      if (!isAdmin) {
-        params.author = user.id;
-      }
-      const response = await postAPI.getPosts(params);
-      if (response.status) {
-        setPosts(response.data.posts);
-        setTotalPages(response.data.pagination.pages);
-      }
-    } catch (error) {
-      console.error('Error fetching posts:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const response = await userAPI.getUserStats();
-      if (response.status) {
-        setStats(response.data);
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
+    getUserStats();
+  }, []);
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this post?')) {
-      try {
-        await postAPI.deletePost(id);
-        fetchPosts();
-      } catch (error) {
-        console.error('Error deleting post:', error);
-      }
+      await deletePost(id);
     }
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>Dashboard</h1>
-        <div>
-          <span style={{ marginRight: '15px' }}>Welcome, {user?.name} ({user?.role})</span>
-          <Link to="/posts/create" style={{ marginRight: '15px' }}>Create Post</Link>
-          {isAdmin && <Link to="/users" style={{ marginRight: '15px' }}>Users</Link>}
-          <Link to="/" style={{ marginRight: '15px' }}>Public Blog</Link>
-          <button onClick={handleLogout}>Logout</button>
+    <div className="container">
+      <div className="navbar">
+        <div className="navbar-content">
+          <h1 style={{ color: '#333', margin: 0 }}>Dashboard</h1>
+          <div className="flex-gap">
+            <span style={{ color: '#666' }}>Welcome, {user?.name} ({user?.role})</span>
+            <Link to="/posts/create" className="btn btn-primary">Create Post</Link>
+            {isAdmin && <Link to="/users" className="btn btn-secondary">Users</Link>}
+            <Link to="/" className="btn btn-secondary">Public Blog</Link>
+            <button onClick={handleLogout} className="btn btn-danger">Logout</button>
+          </div>
         </div>
       </div>
 
       {stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '30px' }}>
-          <div style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '5px' }}>
+        <div className="stats-grid">
+          <div className="stat-card">
             <h3>Total Posts</h3>
-            <p style={{ fontSize: '24px', fontWeight: 'bold' }}>{stats.totalPosts}</p>
+            <p>{stats.totalPosts}</p>
           </div>
-          <div style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '5px' }}>
+          <div className="stat-card">
             <h3>Published</h3>
-            <p style={{ fontSize: '24px', fontWeight: 'bold' }}>{stats.publishedPosts}</p>
+            <p>{stats.publishedPosts}</p>
           </div>
-          <div style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '5px' }}>
+          <div className="stat-card">
             <h3>Drafts</h3>
-            <p style={{ fontSize: '24px', fontWeight: 'bold' }}>{stats.draftPosts}</p>
+            <p>{stats.draftPosts}</p>
           </div>
         </div>
       )}
 
-      <h2>My Posts</h2>
-      {loading ? (
-        <p>Loading...</p>
+      <h2 style={{ marginBottom: '20px', color: '#333' }}>My Posts</h2>
+      {loading && posts.length === 0 ? (
+        <div className="loading">Loading...</div>
       ) : posts.length === 0 ? (
-        <p>No posts found. <Link to="/posts/create">Create your first post</Link></p>
+        <div className="empty-state">
+          <h3>No posts found</h3>
+          <p><Link to="/posts/create" className="text-link">Create your first post</Link></p>
+        </div>
       ) : (
-        <>
-          <div style={{ marginBottom: '20px' }}>
-            {posts.map((post) => (
-              <div key={post._id} style={{ border: '1px solid #ccc', padding: '15px', marginBottom: '15px', borderRadius: '5px' }}>
-                <h3>
-                  <Link to={`/posts/${post._id}`}>{post.title}</Link>
-                </h3>
-                {post.image && (
-                  <div style={{ marginBottom: '10px' }}>
-                    <img
-                      src={getImageUrl(post.image)}
-                      alt={post.title}
-                      style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '5px' }}
-                    />
-                  </div>
-                )}
-                <p style={{ color: '#666' }}>
-                  Status: <span style={{ fontWeight: 'bold', color: post.status === 'published' ? 'green' : 'orange' }}>
-                    {post.status.toUpperCase()}
-                  </span>
-                  {' | '}
-                  Author: {post.author?.name}
-                  {' | '}
-                  Views: {post.views}
-                  {' | '}
-                  Created: {new Date(post.createdAt).toLocaleDateString()}
-                </p>
-                <div>
-                  <Link to={`/posts/${post._id}/edit`} style={{ marginRight: '10px' }}>Edit</Link>
-                  <button onClick={() => handleDelete(post._id)} style={{ color: 'red', cursor: 'pointer', border: 'none', background: 'none' }}>
-                    Delete
-                  </button>
-                </div>
+        <InfiniteScroll onLoadMore={loadMore} hasMore={hasMore} loading={loading}>
+          {posts.map((post) => (
+            <div key={post._id} className="post-card">
+              <h3 style={{ marginBottom: '12px' }}>
+                <Link to={`/posts/${post._id}`} className="text-link">{post.title}</Link>
+              </h3>
+              {post.image && (
+                <img
+                  src={getImageUrl(post.image)}
+                  alt={post.title}
+                  className="post-image"
+                />
+              )}
+              <div className="post-meta">
+                <span className={`status-badge status-${post.status}`}>{post.status}</span>
+                {' • '}
+                <span>By {post.author?.name}</span>
+                {' • '}
+                <span>{post.views} views</span>
+                {' • '}
+                <span>{new Date(post.createdAt).toLocaleDateString()}</span>
               </div>
-            ))}
-          </div>
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button>
-              <span>Page {page} of {totalPages}</span>
-              <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</button>
+              <div className="flex-gap" style={{ marginTop: '12px' }}>
+                <Link to={`/posts/${post._id}/edit`} className="btn btn-secondary">Edit</Link>
+                <button onClick={() => handleDelete(post._id)} className="btn btn-danger">
+                  Delete
+                </button>
+              </div>
             </div>
-          )}
-        </>
+          ))}
+        </InfiniteScroll>
       )}
     </div>
   );

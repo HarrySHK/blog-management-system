@@ -1,98 +1,116 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { userAPI } from '../utils/api';
+import { useUsers } from '../hooks/useUsers';
+import '../styles/global.css';
 
 const Users = () => {
   const { logout } = useAuth();
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { users, loading, getAllUsers } = useUsers();
+  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchUsers();
-  }, [page, search]);
+  }, [page]);
 
   const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const params = { page, limit: 10 };
-      if (search) {
-        params.search = search;
-      }
-      const response = await userAPI.getAllUsers(params);
-      if (response.status) {
-        setUsers(response.data.users);
-        setTotalPages(response.data.pagination.pages);
-      }
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    } finally {
-      setLoading(false);
+    const params = { page, limit: 10 };
+    if (search) {
+      params.search = search;
+    }
+    const result = await getAllUsers(params);
+    if (result.success) {
+      setTotalPages(result.pagination?.pages || 1);
     }
   };
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setPage(1);
+    fetchUsers();
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>Users</h1>
-        <div>
-          <Link to="/dashboard" style={{ marginRight: '15px' }}>Dashboard</Link>
-          <button onClick={logout}>Logout</button>
+    <div className="container">
+      <div className="navbar">
+        <div className="navbar-content">
+          <h1 style={{ color: '#333', margin: 0 }}>Users</h1>
+          <div className="flex-gap">
+            <Link to="/dashboard" className="btn btn-secondary">Dashboard</Link>
+            <button onClick={handleLogout} className="btn btn-danger">Logout</button>
+          </div>
         </div>
       </div>
 
-      <form onSubmit={(e) => { e.preventDefault(); setPage(1); fetchUsers(); }} style={{ marginBottom: '20px' }}>
+      <form onSubmit={handleSearch} className="search-container">
         <input
           type="text"
+          className="search-input"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search users..."
-          style={{ width: '300px', padding: '8px', marginRight: '10px' }}
         />
-        <button type="submit">Search</button>
+        <button type="submit" className="btn btn-primary">Search</button>
         {search && (
-          <button type="button" onClick={() => { setSearch(''); setPage(1); }} style={{ marginLeft: '10px' }}>
+          <button type="button" onClick={() => { setSearch(''); setPage(1); }} className="btn btn-secondary">
             Clear
           </button>
         )}
       </form>
 
-      {loading ? (
-        <p>Loading...</p>
+      {loading && users.length === 0 ? (
+        <div className="loading">Loading...</div>
       ) : users.length === 0 ? (
-        <p>No users found.</p>
+        <div className="empty-state">
+          <h3>No users found</h3>
+        </div>
       ) : (
         <>
-          <div style={{ marginBottom: '20px' }}>
+          <div className="card">
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '2px solid #ccc' }}>
-                  <th style={{ padding: '10px', textAlign: 'left' }}>Name</th>
-                  <th style={{ padding: '10px', textAlign: 'left' }}>Email</th>
-                  <th style={{ padding: '10px', textAlign: 'left' }}>Role</th>
-                  <th style={{ padding: '10px', textAlign: 'left' }}>Created</th>
+                <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
+                  <th style={{ padding: '12px', textAlign: 'left', color: '#333', fontWeight: '600' }}>Name</th>
+                  <th style={{ padding: '12px', textAlign: 'left', color: '#333', fontWeight: '600' }}>Email</th>
+                  <th style={{ padding: '12px', textAlign: 'left', color: '#333', fontWeight: '600' }}>Role</th>
+                  <th style={{ padding: '12px', textAlign: 'left', color: '#333', fontWeight: '600' }}>Created</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((user) => (
                   <tr key={user._id} style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '10px' }}>{user.name}</td>
-                    <td style={{ padding: '10px' }}>{user.email}</td>
-                    <td style={{ padding: '10px' }}>{user.role}</td>
-                    <td style={{ padding: '10px' }}>{new Date(user.createdAt).toLocaleDateString()}</td>
+                    <td style={{ padding: '12px', color: '#555' }}>{user.name}</td>
+                    <td style={{ padding: '12px', color: '#555' }}>{user.email}</td>
+                    <td style={{ padding: '12px' }}>
+                      <span className={`status-badge status-${user.role === 'admin' ? 'published' : 'draft'}`}>
+                        {user.role}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px', color: '#666' }}>{new Date(user.createdAt).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           {totalPages > 1 && (
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button>
-              <span>Page {page} of {totalPages}</span>
-              <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</button>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
+              <button disabled={page === 1} onClick={() => setPage(page - 1)} className="btn btn-secondary">
+                Previous
+              </button>
+              <span style={{ display: 'flex', alignItems: 'center', color: '#666' }}>
+                Page {page} of {totalPages}
+              </span>
+              <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="btn btn-secondary">
+                Next
+              </button>
             </div>
           )}
         </>

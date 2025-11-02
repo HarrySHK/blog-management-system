@@ -1,125 +1,92 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { postAPI, getImageUrl } from '../utils/api';
+import { usePublicPosts } from '../hooks/usePosts';
+import { getImageUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import InfiniteScroll from '../components/InfiniteScroll';
+import '../styles/global.css';
 
 const PublicBlog = () => {
   const { isAuthenticated } = useAuth();
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const { posts, loading, hasMore, loadMore, search, setSearch } = usePublicPosts('');
 
-  useEffect(() => {
-    fetchPosts();
-  }, [page, search]);
-
-  const fetchPosts = async () => {
-    try {
-      setLoading(true);
-      const params = { page, limit: 10 };
-      if (search) {
-        params.search = search;
-      }
-      const response = await postAPI.getPublicPosts(params);
-      if (response.status) {
-        setPosts(response.data.posts);
-        setTotalPages(response.data.pagination.pages);
-      }
-    } catch (error) {
-      console.error('Error fetching posts:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setPage(1);
-    fetchPosts();
+  const handleSearchChange = (e) => {
+    setSearch(e.target.value);
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <h1>Blog</h1>
-        <div>
-          {isAuthenticated ? (
-            <Link to="/dashboard">Dashboard</Link>
-          ) : (
-            <>
-              <Link to="/login" style={{ marginRight: '15px' }}>Login</Link>
-              <Link to="/register">Register</Link>
-            </>
-          )}
+    <div className="container">
+      <div className="navbar">
+        <div className="navbar-content">
+          <h1 style={{ color: '#333', margin: 0 }}>Blog</h1>
+          <div className="flex-gap">
+            {isAuthenticated ? (
+              <Link to="/dashboard" className="btn btn-primary">Dashboard</Link>
+            ) : (
+              <>
+                <Link to="/login" className="btn btn-secondary">Login</Link>
+                <Link to="/register" className="btn btn-primary">Register</Link>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      <form onSubmit={handleSearch} style={{ marginBottom: '30px' }}>
+      <div className="search-container">
         <input
           type="text"
+          className="search-input"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={handleSearchChange}
           placeholder="Search posts..."
-          style={{ width: '300px', padding: '8px', marginRight: '10px' }}
         />
-        <button type="submit">Search</button>
         {search && (
-          <button type="button" onClick={() => { setSearch(''); setPage(1); }} style={{ marginLeft: '10px' }}>
+          <button onClick={() => setSearch('')} className="btn btn-secondary">
             Clear
           </button>
         )}
-      </form>
+      </div>
 
-      {loading ? (
-        <p>Loading...</p>
+      {loading && posts.length === 0 ? (
+        <div className="loading">Loading...</div>
       ) : posts.length === 0 ? (
-        <p>No posts found.</p>
+        <div className="empty-state">
+          <h3>No posts found</h3>
+          <p>Try adjusting your search or check back later.</p>
+        </div>
       ) : (
-        <>
-          <div style={{ marginBottom: '20px' }}>
-            {posts.map((post) => (
-              <div key={post._id} style={{ border: '1px solid #ccc', padding: '20px', marginBottom: '20px', borderRadius: '5px' }}>
-                <h2>
-                  <Link to={`/posts/${post._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                    {post.title}
-                  </Link>
-                </h2>
-                <div style={{ color: '#666', marginBottom: '10px' }}>
-                  By {post.author?.name} | {new Date(post.createdAt).toLocaleDateString()} | Views: {post.views}
-                </div>
-                {post.image && (
-                  <div style={{ marginBottom: '10px' }}>
-                    <img
-                      src={getImageUrl(post.image)}
-                      alt={post.title}
-                      style={{ width: '100%', maxHeight: '300px', objectFit: 'cover', borderRadius: '5px' }}
-                    />
-                  </div>
-                )}
-                {post.excerpt && <p style={{ marginBottom: '10px' }}>{post.excerpt}</p>}
-                <Link to={`/posts/${post._id}`}>Read more →</Link>
+        <InfiniteScroll onLoadMore={loadMore} hasMore={hasMore} loading={loading}>
+          {posts.map((post) => (
+            <div key={post._id} className="post-card">
+              <h2 style={{ marginBottom: '12px' }}>
+                <Link to={`/posts/${post._id}`} className="text-link">{post.title}</Link>
+              </h2>
+              <div className="post-meta">
+                By {post.author?.name} • {new Date(post.createdAt).toLocaleDateString()} • {post.views} views
+              </div>
+              {post.image && (
+                <img
+                  src={getImageUrl(post.image)}
+                  alt={post.title}
+                  className="post-image"
+                />
+              )}
+              {post.excerpt && (
+                <p style={{ marginBottom: '16px', color: '#555', lineHeight: '1.6' }}>{post.excerpt}</p>
+              )}
+              <div className="flex-between">
+                <Link to={`/posts/${post._id}`} className="text-link">Read more →</Link>
                 {post.tags && post.tags.length > 0 && (
-                  <div style={{ marginTop: '10px' }}>
+                  <div>
                     {post.tags.map(tag => (
-                      <span key={tag} style={{ marginRight: '5px', background: '#f0f0f0', padding: '2px 8px', borderRadius: '3px', fontSize: '0.9em' }}>
-                        {tag}
-                      </span>
+                      <span key={tag} className="tag">{tag}</span>
                     ))}
                   </div>
                 )}
               </div>
-            ))}
-          </div>
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '30px' }}>
-              <button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button>
-              <span>Page {page} of {totalPages}</span>
-              <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</button>
             </div>
-          )}
-        </>
+          ))}
+        </InfiniteScroll>
       )}
     </div>
   );

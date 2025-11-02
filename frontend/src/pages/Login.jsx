@@ -1,17 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import '../styles/global.css';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { login: contextLogin, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
   if (isAuthenticated) {
-    navigate('/dashboard');
     return null;
   }
 
@@ -20,50 +26,56 @@ const Login = () => {
     setError('');
     setLoading(true);
 
-    const result = await login(email, password);
+    const result = await contextLogin(email, password);
     if (result.success) {
       navigate('/dashboard');
     } else {
-      setError(result.message);
+      setError(result.message || 'Login failed');
     }
     setLoading(false);
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px' }}>
-      <h2>Login</h2>
-      <form onSubmit={handleSubmit}>
-        {error && <div style={{ color: 'red', marginBottom: '10px' }}>{error}</div>}
-        <div style={{ marginBottom: '15px' }}>
-          <label>Email:</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
+    <div className="container" style={{ maxWidth: '450px', marginTop: '80px' }}>
+      <div className="card">
+        <h2 style={{ marginBottom: '24px', color: '#333', textAlign: 'center' }}>Login</h2>
+        <form onSubmit={handleSubmit}>
+          {error && <div className="error">{error}</div>}
+          <div className="form-group">
+            <label className="label">Email:</label>
+            <input
+              type="email"
+              className="input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="Enter your email"
+            />
+          </div>
+          <div className="form-group">
+            <label className="label">Password:</label>
+            <input
+              type="password"
+              className="input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="Enter your password"
+            />
+          </div>
+          <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: '100%', marginTop: '12px' }}>
+            {loading ? 'Logging in...' : 'Login'}
+          </button>
+        </form>
+        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          <p style={{ color: '#666', marginBottom: '10px' }}>
+            Don't have an account? <Link to="/register" className="text-link">Register</Link>
+          </p>
+          <p>
+            <Link to="/" className="text-link">View Public Blog</Link>
+          </p>
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>Password:</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        <button type="submit" disabled={loading} style={{ width: '100%', padding: '10px', marginBottom: '10px' }}>
-          {loading ? 'Logging in...' : 'Login'}
-        </button>
-      </form>
-      <p>
-        Don't have an account? <Link to="/register">Register</Link>
-      </p>
-      <p>
-        <Link to="/">View Public Blog</Link>
-      </p>
+      </div>
     </div>
   );
 };
