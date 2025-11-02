@@ -25,9 +25,38 @@ api.interceptors.response.use(
   (response) => {
     return response.data;
   },
-  (error) => {
-    if (error.response?.status === 401) {
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (refreshToken) {
+          const refreshResponse = await axios.post(
+            `${API_URL}/${API_VERSION}/auth/refresh`,
+            { refreshToken },
+            { withCredentials: true }
+          );
+          
+          if (refreshResponse.data?.status) {
+            const newToken = refreshResponse.data.data.token;
+            localStorage.setItem('token', newToken);
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return api(originalRequest);
+          }
+        }
+      } catch (refreshError) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
@@ -38,7 +67,8 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
-  logout: () => api.post('/auth/logout'),
+  refresh: (data) => api.post('/auth/refresh', data),
+  logout: (data) => api.post('/auth/logout', data),
 };
 
 export const postAPI = {

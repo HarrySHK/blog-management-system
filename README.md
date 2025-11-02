@@ -55,6 +55,7 @@ npm install
 PORT=5000
 MONGODB_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret_key
+JWT_REFRESH_SECRET=your_jwt_refresh_secret_key
 API_VERSION=v1
 ```
 
@@ -136,6 +137,7 @@ blog-management-system/
 ### Authentication
 - `POST /api/v1/auth/register` - Register a new user
 - `POST /api/v1/auth/login` - Login user
+- `POST /api/v1/auth/refresh` - Refresh access token
 - `POST /api/v1/auth/logout` - Logout user
 
 ### Posts

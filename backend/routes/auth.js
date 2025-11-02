@@ -6,6 +6,7 @@ const authRouter = Router();
 
 authRouter.route('/register').post(controller.register);
 authRouter.route('/login').post(controller.login);
+authRouter.route('/refresh').post(controller.refresh);
 authRouter.route('/logout').post(Auth, controller.logout);
 
 export default authRouter;

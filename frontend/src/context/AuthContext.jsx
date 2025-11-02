@@ -24,6 +24,7 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         console.error('Error parsing user data:', error);
         localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
       }
     }
@@ -35,6 +36,9 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.login({ email, password });
       if (response.status) {
         localStorage.setItem('token', response.data.token);
+        if (response.data.refreshToken) {
+          localStorage.setItem('refreshToken', response.data.refreshToken);
+        }
         localStorage.setItem('user', JSON.stringify(response.data.user));
         setUser(response.data.user);
         return { success: true };
@@ -50,6 +54,9 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.register({ name, email, password, role });
       if (response.status) {
         localStorage.setItem('token', response.data.token);
+        if (response.data.refreshToken) {
+          localStorage.setItem('refreshToken', response.data.refreshToken);
+        }
         localStorage.setItem('user', JSON.stringify(response.data.user));
         setUser(response.data.user);
         return { success: true };
@@ -62,11 +69,13 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await authAPI.logout();
+      const refreshToken = localStorage.getItem('refreshToken');
+      await authAPI.logout({ refreshToken });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       setUser(null);
     }

@@ -116,3 +116,19 @@
 {"level":"info","message":"Posts fetched successfully","timestamp":"2025-11-02T08:59:19.143Z"}
 {"level":"info","message":"User stats fetched successfully","timestamp":"2025-11-02T08:59:19.397Z"}
 {"level":"info","message":"User logged out successfully.","timestamp":"2025-11-02T09:00:52.973Z"}
+{"level":"error","message":"Login Error: Error: secretOrPrivateKey must have a value","timestamp":"2025-11-02T09:43:13.690Z"}
+{"level":"error","message":"Login Error: Error: secretOrPrivateKey must have a value","timestamp":"2025-11-02T09:43:13.690Z"}
+{"level":"error","message":"Login Error: Error: secretOrPrivateKey must have a value","timestamp":"2025-11-02T09:45:43.770Z"}
+{"level":"error","message":"Login Error: Error: secretOrPrivateKey must have a value","timestamp":"2025-11-02T09:45:43.770Z"}
+{"level":"info","message":"6907181550c53f76c8564b49 Login Successful","timestamp":"2025-11-02T09:47:05.986Z"}
+{"level":"info","message":"Posts fetched successfully","timestamp":"2025-11-02T09:47:06.991Z"}
+{"level":"info","message":"User stats fetched successfully","timestamp":"2025-11-02T09:47:07.022Z"}
+{"level":"info","message":"Posts fetched successfully","timestamp":"2025-11-02T09:47:07.817Z"}
+{"level":"info","message":"User stats fetched successfully","timestamp":"2025-11-02T09:47:07.865Z"}
+{"level":"info","message":"Public posts fetched successfully","timestamp":"2025-11-02T09:47:40.709Z"}
+{"level":"info","message":"Public posts fetched successfully","timestamp":"2025-11-02T09:47:41.335Z"}
+{"level":"info","message":"User stats fetched successfully","timestamp":"2025-11-02T09:47:47.875Z"}
+{"level":"info","message":"Posts fetched successfully","timestamp":"2025-11-02T09:47:47.887Z"}
+{"level":"info","message":"User stats fetched successfully","timestamp":"2025-11-02T09:47:48.695Z"}
+{"level":"info","message":"Posts fetched successfully","timestamp":"2025-11-02T09:47:48.723Z"}
+{"level":"info","message":"User logged out successfully.","timestamp":"2025-11-02T09:47:52.942Z"}
